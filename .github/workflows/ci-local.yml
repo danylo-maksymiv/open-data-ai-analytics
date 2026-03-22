@@ -1,0 +1,29 @@
+name: "Self-Hosted CI Test"
+
+on:
+  workflow_dispatch: 
+
+jobs:
+  local-run:
+    runs-on: self-hosted 
+
+    steps:
+      - name: "Downloading code"
+        uses: actions/checkout@v4
+
+      - name: "Installing dependencies"
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: "Running data_quality module"
+        run: |
+          cd src
+          python data_load.py
+          python data_quality.py
+
+      - name: "Uploading Artifacts"
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-results
+          path: data/processed/

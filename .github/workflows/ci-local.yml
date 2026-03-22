@@ -13,7 +13,7 @@ jobs:
 
       - name: "Setup environment and Run"
         run: |
-          python3 -m venv runner_env
+          python3.11 -m venv runner_env
           
           source runner_env/bin/activate
           

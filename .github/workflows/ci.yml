@@ -90,28 +90,31 @@ jobs:
       - name: "Running module"
         if: github.event_name == 'workflow_dispatch' || steps.check_files.outputs.any_changed == 'true'
         shell: bash
+        env:
+          PYTHONIOENCODING: 'utf-8' 
         run: |
+          set -e 
+          
           if [ "${{ matrix.module.name }}" != "data_load" ]; then
-            cd src && python data_load.py && cd ..
+            (cd src && python data_load.py)
           fi
           
           if [ "${{ matrix.module.name }}" == "data_research" ] || [ "${{ matrix.module.name }}" == "visualization" ]; then
-            cd src && python data_quality.py && cd ..
+            (cd src && python data_quality.py)
           fi
           
           FOLDER=$(dirname "${{ matrix.module.path }}")
-          cd "$FOLDER"
           FILENAME=$(basename "${{ matrix.module.path }}")
           
           if [ "${{ matrix.module.tool }}" == "jupyter" ]; then            
             pip install jupyter nbconvert
-            jupyter nbconvert --to notebook --execute "$FILENAME"
+            (cd "$FOLDER" && jupyter nbconvert --to notebook --execute "$FILENAME")
           else
             if [ "${{ matrix.module.name }}" == "data_research" ]; then
-              mkdir -p ../reports
-              python "$FILENAME" > ../reports/research.log
+              mkdir -p reports
+              (cd "$FOLDER" && python "$FILENAME" > ../reports/research.log)
             else
-              python "$FILENAME"
+              (cd "$FOLDER" && python "$FILENAME")
             fi
           fi
 

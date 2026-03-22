@@ -1,0 +1,123 @@
+name: "Data analytics workflow"
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+    
+  workflow_dispatch:
+    inputs:
+      module:
+        description: "Which module should be tested?"
+        type: choice
+        required: true
+        options:
+          - data_load
+          - data_quality
+          - data_research
+          - visualization
+          - all
+        default: all
+      os:
+        description: "Which os should be used?"
+        type: choice
+        required: true
+        options:
+          - macos-latest
+          - windows-latest
+          - ubuntu-latest
+          - all
+        default: "macos-latest"
+      python-version:
+        description: "Which python-version should be used?"
+        type: choice
+        required: true
+        options:
+          - "3.11"
+          - "3.12"
+          - all
+        default: "3.11"
+  
+jobs:
+  test-modules:
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        module: >-
+          ${{ fromJson(
+            (inputs.module == '' || inputs.module == 'all') && '[
+              {"name": "data_load", "path": "src/data_load.py", "tool": "python", "artifact_path": "data/raw/"},
+              {"name": "data_quality", "path": "src/data_quality.py", "tool": "python", "artifact_path": "data/processed/"},
+              {"name": "data_research", "path": "src/data_research.py", "tool": "python", "artifact_path": "reports/research.log"},
+              {"name": "visualization", "path": "notebooks/visualization.ipynb", "tool": "jupyter", "artifact_path": "reports/"}
+            ]' ||
+            inputs.module == 'data_load' && '[{"name": "data_load", "path": "src/data_load.py", "tool": "python", "artifact_path": "data/raw/"}]' ||
+            inputs.module == 'data_quality' && '[{"name": "data_quality", "path": "src/data_quality.py", "tool": "python", "artifact_path": "data/processed/"}]' ||
+            inputs.module == 'data_research' && '[{"name": "data_research", "path": "src/data_research.py", "tool": "python", "artifact_path": "reports/research.log"}]' ||
+            inputs.module == 'visualization' && '[{"name": "visualization", "path": "notebooks/visualization.ipynb", "tool": "jupyter", "artifact_path": "reports/"}]'
+          ) }}
+        os: ${{ fromJson( (inputs.os == '' || inputs.os == 'all') && '["macos-latest", "windows-latest", "ubuntu-latest"]' || format('["{0}"]', inputs.os) ) }}
+        python-version: ${{ fromJson( (inputs.python-version == '' || inputs.python-version == 'all') && '["3.11", "3.12"]' || format('["{0}"]', inputs.python-version) ) }}
+
+    runs-on: ${{ matrix.os }}
+        
+    steps:
+      - name: "Downloading code"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: "Checking changes"
+        id: check_files
+        uses: tj-actions/changed-files@v44
+        with:
+          files: ${{ matrix.module.path }}
+
+      - name: "Setting Python up"
+        if: github.event_name == 'workflow_dispatch' || steps.check_files.outputs.any_changed == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: "Installing dependencies"
+        if: github.event_name == 'workflow_dispatch' || steps.check_files.outputs.any_changed == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: "Running module"
+        if: github.event_name == 'workflow_dispatch' || steps.check_files.outputs.any_changed == 'true'
+        run: |
+          if [ "${{ matrix.module.name }}" != "data_load" ]; then
+            cd src && python data_load.py && cd ..
+          fi
+          
+          if [ "${{ matrix.module.name }}" == "data_research" ] || [ "${{ matrix.module.name }}" == "visualization" ]; then
+            cd src && python data_quality.py && cd ..
+          fi
+          
+          FOLDER=$(dirname "${{ matrix.module.path }}")
+          cd "$FOLDER"
+          FILENAME=$(basename "${{ matrix.module.path }}")
+          
+          if [ "${{ matrix.module.tool }}" == "jupyter" ]; then            
+            pip install jupyter nbconvert
+            jupyter nbconvert --to notebook --execute "$FILENAME"
+          else
+            if [ "${{ matrix.module.name }}" == "data_research" ]; then
+              mkdir -p ../reports
+              python "$FILENAME" > ../reports/research.log
+            else
+              python "$FILENAME"
+            fi
+          fi
+
+      - name: "Uploading Artifacts"
+        if: github.event_name == 'workflow_dispatch' || steps.check_files.outputs.any_changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.module.name }}
+          path: ${{ matrix.module.artifact_path }}
+          if-no-files-found: ignore

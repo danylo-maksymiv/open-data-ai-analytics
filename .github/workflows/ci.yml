@@ -89,6 +89,7 @@ jobs:
 
       - name: "Running module"
         if: github.event_name == 'workflow_dispatch' || steps.check_files.outputs.any_changed == 'true'
+        shell: bash
         run: |
           if [ "${{ matrix.module.name }}" != "data_load" ]; then
             cd src && python data_load.py && cd ..
@@ -118,6 +119,6 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || steps.check_files.outputs.any_changed == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: results-${{ matrix.module.name }}
+          name: results-${{ matrix.module.name }}-${{ matrix.os }}-${{ matrix.python-version }}
           path: ${{ matrix.module.artifact_path }}
           if-no-files-found: ignore

@@ -1,0 +1,133 @@
+name: kpr-analytics
+
+networks:
+  analytics-net:
+    driver: bridge
+
+volumes:
+  db-data:
+  reports-data:
+  plots-data:
+
+services:
+
+  # ─────────────────────────────────────────────────────────
+  # 1. ЗАВАНТАЖЕННЯ ДАНИХ
+  # ─────────────────────────────────────────────────────────
+  data_load:
+    build:
+      context: ./data_load
+      dockerfile: Dockerfile
+    container_name: kpr-data-load
+    env_file: .env
+    environment:
+      # Скрипт скачає файл сюди, а потім покладе в базу
+      - CSV_PATH=/tmp/kontrolno-perevirochna-robota.csv
+      - DB_PATH=/db/analytics.db
+    volumes:
+      - db-data:/db                  # Спільна БД
+    networks:
+      - analytics-net
+    restart: "no"
+
+  # ─────────────────────────────────────────────────────────
+  # 2. ПЕРЕВІРКА ЯКОСТІ ДАНИХ (Чекає на Завантаження)
+  # ─────────────────────────────────────────────────────────
+  data_quality:
+    build:
+      context: ./data_quality
+      dockerfile: Dockerfile
+    container_name: kpr-quality
+    env_file: .env
+    environment:
+      - DB_PATH=/db/analytics.db
+      - REPORT_PATH=/reports/quality_report.json
+    volumes:
+      - db-data:/db                  # ТУТ ПРИБРАЛИ :ro (бо скрипт ПЕРЕЗАПИСУЄ чисті дані)
+      - reports-data:/reports        # Звіти
+    networks:
+      - analytics-net
+    depends_on:
+      data_load:
+        condition: service_completed_successfully
+    restart: "no"
+
+  # ─────────────────────────────────────────────────────────
+  # 3. ДОСЛІДЖЕННЯ ДАНИХ (Чекає на Якість)
+  # ─────────────────────────────────────────────────────────
+  data_research:
+    build:
+      context: ./data_research
+      dockerfile: Dockerfile
+    container_name: kpr-research
+    env_file: .env
+    environment:
+      - DB_PATH=/db/analytics.db
+      - REPORT_PATH=/reports/research_report.json
+    volumes:
+      - db-data:/db:ro               # БД (read-only)
+      - reports-data:/reports        # Звіти
+    networks:
+      - analytics-net
+    depends_on:
+      data_quality:
+        condition: service_completed_successfully
+    restart: "no"
+
+  # ─────────────────────────────────────────────────────────
+  # 4. ВІЗУАЛІЗАЦІЯ (Чекає на Якість)
+  # ─────────────────────────────────────────────────────────
+  visualization:
+    build:
+      context: ./visualization
+      dockerfile: Dockerfile
+    container_name: kpr-visualization
+    env_file: .env
+    environment:
+      - DB_PATH=/db/analytics.db
+      - PLOTS_DIR=/plots
+    volumes:
+      - db-data:/db:ro               # БД (read-only)
+      - plots-data:/plots            # Графіки
+    networks:
+      - analytics-net
+    depends_on:
+      data_quality:
+        condition: service_completed_successfully
+    restart: "no"
+
+  # ─────────────────────────────────────────────────────────
+  # 5. ВЕБ-ІНТЕРФЕЙС (Чекає на Дослідження та Візуалізацію)
+  # ─────────────────────────────────────────────────────────
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: kpr-web
+    env_file: .env
+    environment:
+      - DB_PATH=/db/analytics.db
+      - REPORTS_DIR=/reports
+      - PLOTS_DIR=/plots
+      - FLASK_ENV=production
+    volumes:
+      - db-data:/db:ro               # БД (read-only)
+      - reports-data:/reports:ro     # Звіти (read-only)
+      - plots-data:/plots:ro         # Графіки (read-only)
+    ports:
+      - "5050:5000"
+    networks:
+      - analytics-net
+    depends_on:
+      data_research:
+        condition: service_completed_successfully
+      visualization:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

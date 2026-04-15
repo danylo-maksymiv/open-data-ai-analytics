@@ -48,7 +48,7 @@ if __name__ == "__main__":
     # 2. Читаємо CSV через Pandas
     print(f"Читаємо дані з {CSV_PATH}...")
     try:
-        df = pd.read_csv(CSV_PATH)
+        df = pd.read_csv(CSV_PATH, sep=';')
     except Exception as e:
         print(f"❌ Помилка читання CSV: {e}")
         sys.exit(1)

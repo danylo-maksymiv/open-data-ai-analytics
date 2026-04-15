@@ -115,7 +115,7 @@ services:
       - reports-data:/reports:ro     # Звіти (read-only)
       - plots-data:/plots:ro         # Графіки (read-only)
     ports:
-      - "5000:5000"
+      - "5050:5000"
     networks:
       - analytics-net
     depends_on:

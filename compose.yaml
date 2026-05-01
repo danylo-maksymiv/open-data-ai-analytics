@@ -10,10 +10,6 @@ volumes:
   plots-data:
 
 services:
-
-  # ─────────────────────────────────────────────────────────
-  # 1. ЗАВАНТАЖЕННЯ ДАНИХ
-  # ─────────────────────────────────────────────────────────
   data_load:
     build:
       context: ./data_load
@@ -21,18 +17,14 @@ services:
     container_name: kpr-data-load
     env_file: .env
     environment:
-      # Скрипт скачає файл сюди, а потім покладе в базу
       - CSV_PATH=/tmp/kontrolno-perevirochna-robota.csv
       - DB_PATH=/db/analytics.db
     volumes:
-      - db-data:/db                  # Спільна БД
+      - db-data:/db
     networks:
       - analytics-net
     restart: "no"
 
-  # ─────────────────────────────────────────────────────────
-  # 2. ПЕРЕВІРКА ЯКОСТІ ДАНИХ (Чекає на Завантаження)
-  # ─────────────────────────────────────────────────────────
   data_quality:
     build:
       context: ./data_quality
@@ -43,8 +35,8 @@ services:
       - DB_PATH=/db/analytics.db
       - REPORT_PATH=/reports/quality_report.json
     volumes:
-      - db-data:/db                  # ТУТ ПРИБРАЛИ :ro (бо скрипт ПЕРЕЗАПИСУЄ чисті дані)
-      - reports-data:/reports        # Звіти
+      - db-data:/db
+      - reports-data:/reports
     networks:
       - analytics-net
     depends_on:
@@ -52,9 +44,7 @@ services:
         condition: service_completed_successfully
     restart: "no"
 
-  # ─────────────────────────────────────────────────────────
-  # 3. ДОСЛІДЖЕННЯ ДАНИХ (Чекає на Якість)
-  # ─────────────────────────────────────────────────────────
+
   data_research:
     build:
       context: ./data_research
@@ -65,8 +55,8 @@ services:
       - DB_PATH=/db/analytics.db
       - REPORT_PATH=/reports/research_report.json
     volumes:
-      - db-data:/db:ro               # БД (read-only)
-      - reports-data:/reports        # Звіти
+      - db-data:/db:ro
+      - reports-data:/reports
     networks:
       - analytics-net
     depends_on:
@@ -74,9 +64,7 @@ services:
         condition: service_completed_successfully
     restart: "no"
 
-  # ─────────────────────────────────────────────────────────
-  # 4. ВІЗУАЛІЗАЦІЯ (Чекає на Якість)
-  # ─────────────────────────────────────────────────────────
+
   visualization:
     build:
       context: ./visualization
@@ -87,8 +75,8 @@ services:
       - DB_PATH=/db/analytics.db
       - PLOTS_DIR=/plots
     volumes:
-      - db-data:/db:ro               # БД (read-only)
-      - plots-data:/plots            # Графіки
+      - db-data:/db:ro
+      - plots-data:/plots
     networks:
       - analytics-net
     depends_on:
@@ -96,9 +84,7 @@ services:
         condition: service_completed_successfully
     restart: "no"
 
-  # ─────────────────────────────────────────────────────────
-  # 5. ВЕБ-ІНТЕРФЕЙС (Чекає на Дослідження та Візуалізацію)
-  # ─────────────────────────────────────────────────────────
+
   web:
     build:
       context: ./web
@@ -111,9 +97,9 @@ services:
       - PLOTS_DIR=/plots
       - FLASK_ENV=production
     volumes:
-      - db-data:/db:ro               # БД (read-only)
-      - reports-data:/reports:ro     # Звіти (read-only)
-      - plots-data:/plots:ro         # Графіки (read-only)
+      - db-data:/db:ro
+      - reports-data:/reports:ro
+      - plots-data:/plots:ro
     ports:
       - "5050:5000"
     networks:

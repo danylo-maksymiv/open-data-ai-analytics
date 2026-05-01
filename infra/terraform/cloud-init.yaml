@@ -1,0 +1,22 @@
+package_update: true
+package_upgrade: true
+
+packages:
+  - git
+  - curl
+
+runcmd:
+  - curl -fsSL https://get.docker.com -o get-docker.sh
+  - sh get-docker.sh
+  - usermod -aG docker ubuntu
+
+  - cd /home/ubuntu
+  - git clone https://github.com/danylo-maksymiv/open-data-ai-analytics.git my_project
+
+  - cd my_project
+  - chown -R ubuntu:ubuntu .
+
+  - echo "CSV_PATH=/tmp/kontrolno-perevirochna-robota.csv" >> .env
+  - echo "DB_PATH=/db/analytics.db" >> .env
+
+  - docker compose up -d --build

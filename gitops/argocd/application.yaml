@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kpr-analytics
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/danylo-maksymiv/open-data-ai-analytics.git
+    targetRevision: main
+    path: gitops/app
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kpr-analytics
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

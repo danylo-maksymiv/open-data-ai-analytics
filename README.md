@@ -191,3 +191,148 @@ terraform destroy -auto-approve
 | `aws_instance` | EC2 Ubuntu VM (t3.micro) з cloud-init |
 | `aws_eip` | Статичний публічний IP |
  
+
+# Моніторинг проєкту KPR Analytics — Prometheus + Grafana
+
+> Стек моніторингу розгорнуто разом із основним Docker-проєктом через `compose.yaml`. Метрики збираються з хост-системи та Docker-контейнерів, візуалізуються в Grafana.
+
+---
+
+## Архітектура моніторингу
+
+```
+┌─────────────────────────────────────────────────────┐
+│                  Docker Compose                      │
+│                                                      │
+│  node-exporter (:9100) ──┐                          │
+│                           ├──► Prometheus (:9090)   │
+│  cAdvisor      (:8080) ──┘         │                │
+│                                    ▼                │
+│                           Grafana (:3000)           │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+## Як розгортається моніторинг
+
+Моніторинг запускається автоматично разом з основним проєктом однією командою:
+
+```bash
+docker compose up -d
+```
+
+Prometheus зчитує конфігурацію з файлу `monitoring/prometheus/prometheus.yml`, який монтується як volume. Grafana стартує з попередньо налаштованими змінними оточення (логін/пароль).
+
+Перевірити, що всі сервіси моніторингу запущені:
+
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+```
+
+---
+
+## Сервіси, що збирають метрики
+
+| Сервіс | Образ | Призначення |
+|--------|-------|-------------|
+| **node-exporter** | `prom/node-exporter:latest` | Метрики хост-системи: CPU, RAM, диск, мережа |
+| **cAdvisor** | `gcr.io/cadvisor/cadvisor:v0.49.0` | Метрики Docker-контейнерів: ресурси кожного контейнера |
+| **prometheus** | `prom/prometheus:latest` | Збирає (scrape) метрики кожні 15 секунд, зберігає time-series |
+| **grafana** | `grafana/grafana:latest` | Візуалізація метрик у вигляді дашбордів |
+
+### Конфігурація Prometheus (`monitoring/prometheus/prometheus.yml`)
+
+```yaml
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+```
+
+---
+
+## Відкриті порти
+
+| Порт | Сервіс | URL | Призначення |
+|------|--------|-----|-------------|
+| **5050** | web (Flask) | `http://HOST:5050` | Основний веб-інтерфейс застосунку |
+| **9090** | Prometheus | `http://HOST:9090` | Веб-інтерфейс Prometheus, перегляд метрик і targets |
+| **3000** | Grafana | `http://HOST:3000` | Дашборди моніторингу |
+| **9100** | node-exporter | `http://HOST:9100/metrics` | Raw метрики хост-системи |
+| **8080** | cAdvisor | `http://HOST:8080` | Raw метрики контейнерів |
+
+---
+
+## Як відкрити Grafana
+
+1. Відкрити браузер і перейти за адресою:
+   ```
+   http://<PUBLIC_IP>:3000
+   ```
+2. Ввести облікові дані за замовчуванням:
+   - **Логін:** `admin`
+   - **Пароль:** `admin`
+3. Після першого входу Grafana запропонує змінити пароль (можна пропустити).
+
+### Налаштування джерела даних Prometheus
+
+Якщо джерело даних не налаштоване автоматично:
+
+1. **Connections → Data sources → Add new data source**
+2. Вибрати **Prometheus**
+3. URL: `http://prometheus:9090`
+4. Натиснути **Save & test** — має з'явитися повідомлення `Successfully queried the Prometheus API`
+
+### Перевірка targets у Prometheus
+
+Перейти на:
+```
+http://<PUBLIC_IP>:9090/targets
+```
+Всі три targets (`cadvisor`, `node-exporter`, `prometheus`) мають мати статус **UP**.
+
+---
+
+## Панелі (дашборди), що створено
+
+### 1. Node Exporter Full (імпортований, ID: 1860)
+
+Готовий дашборд зі спільноти Grafana для моніторингу хост-системи через node-exporter. Містить:
+
+- **Quick CPU / Mem / Disk** — зведені gauge-індикатори: завантаження CPU, RAM, I/O
+- **CPU Basic** — графік завантаження процесора (Busy System, Busy User, Idle тощо)
+- **Memory Basic** — використання оперативної пам'яті (Used, Cache+Buffer, Free, Swap)
+- **Network Traffic Basic** — швидкість мережевого трафіку (вхідний/вихідний)
+- **Disk Space Used Basic** — відсоток використання дискового простору
+
+### 2. Власний дашборд (ручне створення)
+
+Створено кастомний дашборд з трьома панелями на базі метрик node-exporter:
+
+| Панель | Метрика | Тип |
+|--------|---------|-----|
+| **Завантаження ЦП у %** | `100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)` | Time series |
+| **Використання оперативки** | `node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes` | Time series |
+| **Disk I/O** | `rate(node_disk_io_time_seconds_total[5m])` | Time series |
+
+---
+
+## Структура файлів моніторингу
+
+```
+monitoring/
+└── prometheus/
+    └── prometheus.yml    # Конфігурація Prometheus (targets та інтервал збору)
+```

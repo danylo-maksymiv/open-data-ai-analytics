@@ -58,3 +58,136 @@ docker compose up --build
 
 3. Дочекайтеся завершення роботи аналітичних сервісів (у логах з'явиться `kpr-web | * Running on all addresses`).
 4. Відкрийте браузер за адресою http://localhost:5050.
+
+---
+ 
+## Крок 1. Відкрити AWS CloudShell
+ 
+1. Перейти на [console.aws.amazon.com](https://console.aws.amazon.com) та увійти в обліковий запис.
+2. У правому верхньому куті натиснути іконку **CloudShell** (`>_`).
+3. Дочекатися запуску оболонки (перший раз — близько хвилини).
+4. Переконатися, що Terraform встановлений:
+```bash
+terraform -v
+```
+ 
+Якщо команда не знайдена — встановити:
+ 
+```bash
+sudo yum install -y yum-utils
+sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
+sudo yum install terraform -y
+```
+ 
+---
+ 
+## Крок 2. Підготовка
+ 
+Згенерувати SSH-ключ для доступу до VM:
+ 
+```bash
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/lab_key -N ""
+```
+ 
+Клонувати репозиторій:
+ 
+```bash
+git clone https://github.com/danylo-maksymiv/open-data-ai-analytics.git
+cd open-data-ai-analytics/infra/terraform
+```
+ 
+Задати змінну з публічним ключем:
+ 
+```bash
+export TF_VAR_ssh_public_key="$(cat ~/.ssh/lab_key.pub)"
+```
+ 
+---
+ 
+## Крок 3. Виконати `terraform apply`
+ 
+Ініціалізувати провайдер:
+ 
+```bash
+terraform init
+```
+ 
+Перевірити конфігурацію і переглянути план:
+ 
+```bash
+terraform fmt
+terraform validate
+terraform plan
+```
+ 
+Застосувати — створити інфраструктуру:
+ 
+```bash
+terraform apply -auto-approve
+```
+ 
+Після завершення Terraform виведе:
+ 
+```
+Apply complete! Resources: X added, 0 changed, 0 destroyed.
+ 
+Outputs:
+web_public_ip = "XX.XX.XX.XX"
+website_url   = "http://XX.XX.XX.XX:5050"
+```
+ 
+> **Увага:** після створення VM потрібно зачекати **5–10 хвилин**, поки cloud-init завершить збірку Docker-образів і запустить контейнери.
+ 
+---
+ 
+## Крок 4. Перевірити результат
+ 
+Відкрити веб-інтерфейс у браузері за адресою з output:
+ 
+```
+http://XX.XX.XX.XX:5050
+```
+ 
+Або перевірити HTTP-відповідь прямо з CloudShell:
+ 
+```bash
+curl http://$(terraform output -raw web_public_ip):5050/health
+# Очікувана відповідь: {"status": "ok"}
+```
+ 
+Щоб перевірити стан контейнерів через SSH:
+ 
+```bash
+ssh -i ~/.ssh/lab_key ubuntu@$(terraform output -raw web_public_ip)
+docker ps
+# або переглянути логи cloud-init:
+sudo tail -100 /var/log/cloud-init-output.log
+```
+ 
+---
+ 
+## Крок 5. Виконати `terraform destroy`
+ 
+**Після демонстрації обов'язково видалити всі ресурси**, щоб не витрачати кредит AWS:
+ 
+```bash
+terraform destroy -auto-approve
+```
+ 
+Переконатися, що EC2-інстанс зупинений у AWS Console: **EC2 → Instances**.
+ 
+---
+ 
+## Опис Terraform-ресурсів
+ 
+| Ресурс | Призначення |
+|--------|-------------|
+| `aws_vpc` | Ізольована мережа для інфраструктури |
+| `aws_subnet` | Підмережа з публічними IP |
+| `aws_internet_gateway` | Доступ до інтернету |
+| `aws_route_table` | Таблиця маршрутизації |
+| `aws_security_group` | Дозволяє порти 22 (SSH) та 5050 (web) |
+| `aws_key_pair` | SSH-ключ для доступу до VM |
+| `aws_instance` | EC2 Ubuntu VM (t3.micro) з cloud-init |
+| `aws_eip` | Статичний публічний IP |
+ 

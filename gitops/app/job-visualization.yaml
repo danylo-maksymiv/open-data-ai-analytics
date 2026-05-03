@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: visualization
+  namespace: kpr-analytics
+  labels:
+    app: visualization
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-quality-report
+          image: busybox
+          command: ['sh', '-c', 'until [ -f /reports/quality_report.json ]; do echo waiting for quality report; sleep 3; done']
+          volumeMounts:
+            - name: reports-data
+              mountPath: /reports
+      containers:
+        - name: visualization
+          image: DOCKERHUB_USERNAME/kpr-visualization:latest
+          env:
+            - name: DB_PATH
+              value: "/db/analytics.db"
+            - name: PLOTS_DIR
+              value: "/plots"
+          volumeMounts:
+            - name: db-data
+              mountPath: /db
+              readOnly: true
+            - name: plots-data
+              mountPath: /plots
+      volumes:
+        - name: db-data
+          persistentVolumeClaim:
+            claimName: db-data
+        - name: plots-data
+          persistentVolumeClaim:
+            claimName: plots-data
+        - name: reports-data
+          persistentVolumeClaim:
+            claimName: reports-data

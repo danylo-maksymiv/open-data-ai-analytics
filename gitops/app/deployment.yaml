@@ -17,14 +17,18 @@ spec:
     spec:
       containers:
         - name: kpr-web
-          image: danylo-maksymiv/kpr-web:latest
+          image: DOCKERHUB_USERNAME/kpr-web:latest
           ports:
             - containerPort: 5000
           env:
             - name: FLASK_ENV
               value: "production"
-            - name: APP_VERSION
-              value: "1.0.0"
+            - name: DB_PATH
+              value: "/db/analytics.db"
+            - name: REPORTS_DIR
+              value: "/reports"
+            - name: PLOTS_DIR
+              value: "/plots"
           livenessProbe:
             httpGet:
               path: /health
@@ -44,3 +48,23 @@ spec:
             limits:
               memory: "256Mi"
               cpu: "500m"
+          volumeMounts:
+            - name: db-data
+              mountPath: /db
+              readOnly: true
+            - name: reports-data
+              mountPath: /reports
+              readOnly: true
+            - name: plots-data
+              mountPath: /plots
+              readOnly: true
+      volumes:
+        - name: db-data
+          persistentVolumeClaim:
+            claimName: db-data
+        - name: reports-data
+          persistentVolumeClaim:
+            claimName: reports-data
+        - name: plots-data
+          persistentVolumeClaim:
+            claimName: plots-data

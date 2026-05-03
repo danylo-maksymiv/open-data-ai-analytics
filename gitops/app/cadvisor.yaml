@@ -14,6 +14,8 @@ spec:
       labels:
         app: cadvisor
     spec:
+      hostNetwork: true
+      hostPID: true
       containers:
         - name: cadvisor
           image: gcr.io/cadvisor/cadvisor:latest
@@ -21,18 +23,18 @@ spec:
             - containerPort: 8080
           securityContext:
             privileged: true
+            runAsUser: 0
+          args:
+            - --docker_only=true
+            - --store_container_labels=false
           volumeMounts:
             - name: rootfs
               mountPath: /rootfs
               readOnly: true
             - name: var-run
               mountPath: /var/run
-              readOnly: true
             - name: sys
               mountPath: /sys
-              readOnly: true
-            - name: docker
-              mountPath: /var/lib/docker
               readOnly: true
             - name: disk
               mountPath: /dev/disk
@@ -47,9 +49,6 @@ spec:
         - name: sys
           hostPath:
             path: /sys
-        - name: docker
-          hostPath:
-            path: /var/lib/docker
         - name: disk
           hostPath:
             path: /dev/disk

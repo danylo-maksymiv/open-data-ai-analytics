@@ -37,6 +37,7 @@ resource "aws_route_table" "public_rt" {
     gateway_id = aws_internet_gateway.gw.id
   }
 }
+
 resource "aws_route_table_association" "a" {
   subnet_id      = aws_subnet.public.id
   route_table_id = aws_route_table.public_rt.id
@@ -54,6 +55,7 @@ resource "aws_security_group" "web_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # Застосунок (docker-compose / попередні лаби)
   ingress {
     from_port   = var.app_port
     to_port     = var.app_port
@@ -61,6 +63,7 @@ resource "aws_security_group" "web_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # Grafana
   ingress {
     from_port   = 3000
     to_port     = 3000
@@ -68,9 +71,18 @@ resource "aws_security_group" "web_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # Prometheus
   ingress {
     from_port   = 9090
     to_port     = 9090
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # k3s / Kubernetes NodePort діапазон (включає 30080 і Argo CD NodePort)
+  ingress {
+    from_port   = 30000
+    to_port     = 32767
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -97,8 +109,7 @@ resource "aws_instance" "app_server" {
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.web_sg.id]
-
-  user_data = file("cloud-init.yaml")
+  user_data              = file("cloud-init.yaml")
 
   tags = {
     Name = "KPR-Docker-Server"

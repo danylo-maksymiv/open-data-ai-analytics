@@ -1,0 +1,40 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: data-research
+  namespace: kpr-analytics
+  labels:
+    app: data-research
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-quality-report
+          image: busybox
+          command: ['sh', '-c', 'until [ -f /reports/quality_report.json ]; do echo waiting for quality report; sleep 3; done']
+          volumeMounts:
+            - name: reports-data
+              mountPath: /reports
+      containers:
+        - name: data-research
+          image: DOCKERHUB_USERNAME/kpr-data_research:latest
+          env:
+            - name: DB_PATH
+              value: "/db/analytics.db"
+            - name: REPORT_PATH
+              value: "/reports/research_report.json"
+          volumeMounts:
+            - name: db-data
+              mountPath: /db
+              readOnly: true
+            - name: reports-data
+              mountPath: /reports
+      volumes:
+        - name: db-data
+          persistentVolumeClaim:
+            claimName: db-data
+        - name: reports-data
+          persistentVolumeClaim:
+            claimName: reports-data

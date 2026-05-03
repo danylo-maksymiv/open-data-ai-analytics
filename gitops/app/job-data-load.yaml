@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: data-load
+  namespace: kpr-analytics
+  labels:
+    app: data-load
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: data-load
+          image: DOCKERHUB_USERNAME/kpr-data_load:latest
+          env:
+            - name: CSV_PATH
+              value: "/tmp/kontrolno-perevirochna-robota.csv"
+            - name: DB_PATH
+              value: "/db/analytics.db"
+          volumeMounts:
+            - name: db-data
+              mountPath: /db
+      volumes:
+        - name: db-data
+          persistentVolumeClaim:
+            claimName: db-data

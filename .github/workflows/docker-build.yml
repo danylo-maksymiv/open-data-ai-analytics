@@ -1,0 +1,49 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "web/**"
+      - "data_load/**"
+      - "data_quality/**"
+      - "data_research/**"
+      - "visualization/**"
+      - "gitops/**"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        service:
+          - name: web
+            context: ./web
+          - name: data_load
+            context: ./data_load
+          - name: data_quality
+            context: ./data_quality
+          - name: data_research
+            context: ./data_research
+          - name: visualization
+            context: ./visualization
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.service.name }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/kpr-${{ matrix.service.name }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/kpr-${{ matrix.service.name }}:${{ github.sha }}

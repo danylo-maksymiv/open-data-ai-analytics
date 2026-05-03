@@ -111,6 +111,10 @@ resource "aws_instance" "app_server" {
   vpc_security_group_ids = [aws_security_group.web_sg.id]
   user_data              = file("cloud-init.yaml")
 
+  root_block_device {
+    volume_size = 20
+  }
+
   tags = {
     Name = "KPR-Docker-Server"
   }

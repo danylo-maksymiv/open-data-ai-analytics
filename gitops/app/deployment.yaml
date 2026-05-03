@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: kpr-web
-          image: DOCKERHUB_USERNAME/kpr-web:latest
+          image: danik777/kpr-web:latest
           ports:
             - containerPort: 5000
           env:

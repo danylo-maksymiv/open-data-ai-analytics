@@ -19,7 +19,7 @@ spec:
               mountPath: /db
       containers:
         - name: data-quality
-          image: DOCKERHUB_USERNAME/kpr-data_quality:latest
+          image: danik777/kpr-data_quality:latest
           env:
             - name: DB_PATH
               value: "/db/analytics.db"

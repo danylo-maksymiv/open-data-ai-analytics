@@ -19,7 +19,7 @@ spec:
               mountPath: /reports
       containers:
         - name: data-research
-          image: DOCKERHUB_USERNAME/kpr-data_research:latest
+          image: danik777/kpr-data_research:latest
           env:
             - name: DB_PATH
               value: "/db/analytics.db"

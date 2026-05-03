@@ -5,7 +5,7 @@ variable "aws_region" {
 
 variable "instance_type" {
   description = "Безкоштовний тип сервера"
-  default     = "t3.micro"
+  default     = "m7i-flex.large"
 }
 
 variable "app_port" {

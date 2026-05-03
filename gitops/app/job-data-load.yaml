@@ -12,7 +12,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: data-load
-          image: DOCKERHUB_USERNAME/kpr-data_load:latest
+          image: danik777/kpr-data_load:latest
           env:
             - name: CSV_PATH
               value: "/tmp/kontrolno-perevirochna-robota.csv"

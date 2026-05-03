@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: cadvisor
-          image: gcr.io/cadvisor/cadvisor:v0.49.0
+          image: gcr.io/cadvisor/cadvisor:latest
           ports:
             - containerPort: 8080
           securityContext:
